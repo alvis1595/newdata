@@ -1,0 +1,109 @@
+Description: Subnets spread across Availability Zones in VPC.
+
+Resources:
+  PrivateSeekerDBSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !ImportValue RDS-VPCId
+      AvailabilityZone: !Select [0, !GetAZs ]
+      CidrBlock: "{{resolve:ssm:/config/infra/rds/cidr-private-subnet-a}}"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: rds-private-subnet-a
+        - Key: ORGANIZATION
+          Value: BGENERAL
+        - Key: DEPARTMENT
+          Value: DSO
+        - Key: SERVICE_TYPE
+          Value: SUBNET
+        - Key: CATEGORY
+          Value: NETWORKING
+
+  PrivateSeekerDBSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !ImportValue RDS-VPCId
+      AvailabilityZone: !Select [1, !GetAZs ]
+      CidrBlock: "{{resolve:ssm:/config/infra/rds/cidr-private-subnet-b}}"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: rds-private-subnet-b
+        - Key: ORGANIZATION
+          Value: BGENERAL
+        - Key: DEPARTMENT
+          Value: DSO
+        - Key: SERVICE_TYPE
+          Value: SUBNET
+        - Key: CATEGORY
+          Value: NETWORKING
+
+  PrivateSeekerDBRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !ImportValue RDS-VPCId
+      Tags:
+        - Key: Name
+          Value: dso-ipd-networking-private-seekerdb-rt-a
+        - Key: ORGANIZATION
+          Value: BGENERAL
+        - Key: DEPARTMENT
+          Value: DSO
+        - Key: SERVICE_TYPE
+          Value: ROUTE_TABLE
+        - Key: CATEGORY
+          Value: NETWORKING
+
+  PrivateSeekerDBRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !ImportValue RDS-VPCId
+      Tags:
+        - Key: Name
+          Value: dso-ipd-networking-private-seekerdb-rt-b
+        - Key: ORGANIZATION
+          Value: BGENERAL
+        - Key: DEPARTMENT
+          Value: DSO
+        - Key: SERVICE_TYPE
+          Value: ROUTE_TABLE
+        - Key: CATEGORY
+          Value: NETWORKING
+
+  PrivateSubnetASeekerDBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSeekerDBSubnetA
+      RouteTableId: !Ref PrivateSeekerDBRouteTableA
+
+  PrivateSubnetBSeekerDBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSeekerDBSubnetB
+      RouteTableId: !Ref PrivateSeekerDBRouteTableB
+
+Outputs:
+  PrivateSeekerDBSubnetA:
+    Description: A reference to the seekerdb private subnet A Availability Zone
+    Value: !Ref PrivateSeekerDBSubnetA
+    Export:
+      Name: rds-private-subnet-a
+
+  PrivateSeekerDBSubnetB:
+    Description: A reference to the seekerdb private subnet B Availability Zone
+    Value: !Ref PrivateSeekerDBSubnetB
+    Export:
+      Name: rds-private-subnet-b
+
+  PrivateSeekerDBRouteTableA:
+    Description: A reference to the seekerdb private rt subnet a
+    Value: !Ref PrivateSeekerDBRouteTableA
+    Export:
+      Name: dso-ipd-networking-private-seekerdb-rt-a
+
+  PrivateSeekerDBRouteTableB:
+    Description: A reference to the seekerdb private rt subnet b
+    Value: !Ref PrivateSeekerDBRouteTableB
+    Export:
+      Name: dso-ipd-networking-private-seekerdb-rt-b
