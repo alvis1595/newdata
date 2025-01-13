@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Template for Aurora PostgreSQL with specific security groups and subnets.
+
+Parameters:
+  DBClusterIdentifier:
+    Description: Identifier for the Aurora PostgreSQL cluster
+    Type: String
+    Default: aurora-postgres-cluster
+
+  DBName:
+    Description: The name of the database to create
+    Type: String
+    Default: aurora_db
+
+  MasterUsername:
+    Description: Master username for the database
+    Type: String
+    Default: admin
+
+  MasterUserPassword:
+    Description: Master password for the database
+    Type: String
+    NoEcho: true
+
+  InstanceClass:
+    Description: Instance class for the Aurora instances
+    Type: String
+    Default: db.m4.xlarge
+
+Resources:
+  # Grupo de subredes para Aurora PostgreSQL
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for Aurora PostgreSQL
+      SubnetIds:
+        - !ImportValue rds-private-subnet-a
+        - !ImportValue rds-private-subnet-b
+      Tags:
+        - Key: Name
+          Value: aurora-postgres-subnet-group
+
+  # Clúster Aurora PostgreSQL
+  AuroraDBCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: !Ref DBClusterIdentifier
+      DatabaseName: !Ref DBName
+      Engine: aurora-postgresql
+      EngineVersion: "13.4"
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      StorageEncrypted: true
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VpcSecurityGroupIds:
+        - !ImportValue SeekerDBSecurityGroup  # Security Group específico
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: 02:00-03:00
+      PreferredMaintenanceWindow: Sun:03:00-Sun:04:00
+      Tags:
+        - Key: Name
+          Value: aurora-postgres-cluster
+
+  # Instancia Aurora PostgreSQL
+  AuroraDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: aurora-postgres-instance
+      DBClusterIdentifier: !Ref AuroraDBCluster
+      Engine: aurora-postgresql
+      DBInstanceClass: !Ref InstanceClass
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: aurora-postgres-instance
+
+Outputs:
+  DBClusterEndpoint:
+    Description: Endpoint for the Aurora PostgreSQL cluster
+    Value: !GetAtt AuroraDBCluster.Endpoint.Address
+
+  ReaderEndpoint:
+    Description: Reader endpoint for the Aurora PostgreSQL cluster
+    Value: !GetAtt AuroraDBCluster.ReaderEndpoint.Address
+
+  DBClusterIdentifier:
+    Description: Identifier of the Aurora PostgreSQL cluster
+    Value: !Ref DBClusterIdentifier
