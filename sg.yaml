@@ -1,0 +1,41 @@
+Description: This template contains the security groups and networks access list.
+
+Resources:
+  SeekerDBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: SeekerDBSecurityGroup
+      VpcId: !ImportValue RDS-VPCId
+      GroupDescription: Common SG for vpc SeekerDB
+      SecurityGroupIngress:
+        - CidrIp: "{{resolve:ssm:/config/infra/devops/ecs/vpc-cidr}}"
+          IpProtocol: -1
+        - CidrIp: "{{resolve:ssm:/config/infra/rds/vpc-cidr}}"
+          IpProtocol: -1
+      Tags:
+        - Key: Name
+          Value: SeekerDBSecurityGroup
+        - Key: ORGANIZATION
+          Value: BGENERAL
+        - Key: DEPARTMENT
+          Value: DSO
+        - Key: SERVICE_TYPE
+          Value: VPC
+        - Key: CATEGORY
+          Value: NETWORKING
+        - Key: RESPONSABLE
+          Value: IPIC
+
+  SeekerDBSecurityGroupEgressTCPAll:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref SeekerDBSecurityGroup
+      IpProtocol: -1
+      CidrIp: 0.0.0.0/0
+
+Outputs:
+  SeekerDBSecurityGroup:
+    Description: SeekerDB Private Security Group
+    Value: !Ref SeekerDBSecurityGroup
+    Export:
+      Name: SeekerDBSecurityGroup
