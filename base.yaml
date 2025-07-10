@@ -1,0 +1,194 @@
+def call() {
+library 'pipelines-common' // librerias de uso comun IPD
+    pipeline {
+        agent {label 'asemon'}
+        environment {
+            DOMAIN_URI = "ldap://bgdccntldom0.bgeneral.com:3268"
+        }
+        stages {
+            stage('Set build name'){
+                steps{
+                    script{
+                        if (params.USER_ID != ""){
+                            common.setBuildName("Crear usuario", "creacion usuario ${USER_ID}")
+                        }else if (CLEAN_USERS == "true"){
+                            common.setBuildName("Eliminacion de usuarios", "")
+                        }
+                    }
+                }
+            }
+            stage('Check User in AD') {
+                when { expression { params.USER_ID != "" } }
+                steps {
+                    script {
+                        def userExists = checkUserInAD(params.USER_ID)
+                        if (userExists == false) {
+                            currentBuild.result = "ABORTED"
+                            error("""El Usuario ${params.USER_ID} no existe o está deshabilitado en el Active Directory.\n
+                            Debe ser un Usuario del Active Directory""")
+                        } 
+                        else {
+                            echo "El Usuario ${params.USER_ID} existe en el Active Directory"
+                        }
+                    }
+                }
+            }
+            stage('Create User in Asemon') {
+                when { expression { params.USER_ID != "" } }
+                steps {
+                    script {
+                        userFullName = getFullNameUserInAD(params.USER_ID)
+                        userFullName = userFullName[1]+" "+userFullName[2]
+                        println("==== Usuario a crear ====="+
+                                "\nUsuario: "+ params.USER_ID +
+                                "\nNombre: "+ userFullName)
+                        createAsemonUser(params.USER_ID, userFullName)
+                    }
+                }
+            }
+
+            stage('Delete users'){
+                when { expression { CLEAN_USERS == "true" } }
+                steps{
+                    script{
+                        def users = getAsemonUsers().split()
+                        def usersToDelete = []
+                        users.each { user ->
+                            exists = checkUserInAD(user)
+                            if(exists == false){
+                                usersToDelete.add(user)
+                            }
+                        }
+                        if (usersToDelete.size > 0){
+                            println("Usuarios a eliminar: ${usersToDelete}")
+                            mailNotifyIPD(usersToDelete)
+                            deleteAsemonUser(usersToDelete)
+                        }
+                    }
+                }
+            }
+        }
+        post {
+            cleanup{ 
+                deleteDir()                
+                dir("${WORKSPACE}@tmp") {
+                    deleteDir()
+                }
+            }
+            failure {
+                script { 
+                    common.mailNotifyError("${IPD_MAIL}")
+                }
+            }
+        } // post
+    } // pipeline
+} // call
+
+def checkUserInAD(String userAccount) {
+    def BASE_OU = "DC=bgeneral,DC=com"
+    withCredentials([usernamePassword(credentialsId: 'devopsldap-standard-login', 
+                    passwordVariable: 'PASS_AD', usernameVariable: 'USER_AD')]) {
+        def userExists = false
+    
+        try {
+            userExists = sh(script: """set +x;
+                ldapsearch -b "${BASE_OU}" "(sAMAccountName=${userAccount})" \
+                -x -D '${USER_AD}' -w '${PASS_AD}' -H ${env.DOMAIN_URI} | grep 'userAccountControl'
+            """, returnStdout: true).split()[1].trim()
+            if (userExists == '512') {
+                userExists = true
+            }
+            else {
+                userExists = false
+            }
+        } catch (Exception e) {
+            println("No existe el usuario (${userAccount}) en el Active Directory")
+        }
+    return userExists
+    }
+}
+
+def getFullNameUserInAD(String userAccount) {
+    def BASE_OU = "DC=bgeneral,DC=com"
+    withCredentials([usernamePassword(credentialsId: 'devopsldap-standard-login', 
+                    passwordVariable: 'PASS_AD', usernameVariable: 'USER_AD')]) {
+        try {
+            fullName = sh(script: """set +x;
+                ldapsearch -b "${BASE_OU}" "(sAMAccountName=${userAccount})" \
+                -x -D '${USER_AD}' -w '${PASS_AD}' -H ${env.DOMAIN_URI} | grep 'displayName:'
+            """, returnStdout: true).split()
+        } catch (Exception e) {
+            println("No cuenta con full name el usuario (${userAccount}) en el Active Directory")
+        }
+    return fullName
+    }
+}
+
+def getAsemonUsers(){
+    withCredentials([usernamePassword(credentialsId: 'asemon-standard-login', 
+                    passwordVariable: 'PASS_ASEMON', usernameVariable: 'USER_ASEMON')]) {
+        writeFile file:'asemon.sh', text:libraryResource('ASEMON/getAsemonUsers.sh')
+        sh 'chmod +x asemon.sh'
+        sh "sed -i 's+VAR_USER+${USER_ASEMON}+' asemon.sh"
+        sh "sed -i 's+VAR_PASSWD+${PASS_ASEMON}+' asemon.sh"
+        users = sh(script: """set +x;
+            docker exec -i bgeneral-asemon-db /bin/sh < asemon.sh | tr -s '\n' | tail -n +3 | head -n -1
+        """, returnStdout: true)
+        return users
+    }
+}
+
+def deleteAsemonUser(users){
+    withCredentials([usernamePassword(credentialsId: 'asemon-standard-login', 
+                    passwordVariable: 'PASS_ASEMON', usernameVariable: 'USER_ASEMON')]) {
+        writeFile file:'delete.sh', text:libraryResource('ASEMON/deleteAsemonUser.sh')
+        sh 'chmod +x delete.sh'
+        sh "sed -i 's+VAR_USER+${USER_ASEMON}+' delete.sh"
+        sh "sed -i 's+VAR_PASSWD+${PASS_ASEMON}+' delete.sh"
+        users.each { u -> 
+            sh "sed -i 's+VAR_LOGIN+${u}+' delete.sh"
+            result = sh(script: """set +x;
+                docker exec -i bgeneral-asemon-db /bin/sh < delete.sh | tail -1
+            """, returnStdout: true).trim()
+        }
+    }
+}
+
+def createAsemonUser(String user, String fullNameUser){
+    withCredentials([usernamePassword(credentialsId: 'asemon-standard-login', 
+                    passwordVariable: 'PASS_ASEMON', usernameVariable: 'USER_ASEMON')]) {
+        writeFile file:'create.sh', text:libraryResource('ASEMON/createAsemonUser.sh')
+        sh 'chmod +x create.sh'
+        sh "sed -i 's+VAR_USER+${USER_ASEMON}+' create.sh"
+        sh "sed -i 's+VAR_PASSWD+${PASS_ASEMON}+' create.sh"
+        sh "sed -i 's+VAR_LOGIN+${user}+' create.sh"
+        sh "sed -i 's+VAR_FULL_NAME+${fullNameUser}+' create.sh"
+        result = sh(script: """set +x;
+            docker exec -i bgeneral-asemon-db /bin/sh < create.sh | tail -1
+        """, returnStdout: true)
+        println(result)
+        if (result.contains('return status = 0') ) {
+            println("Usuario creado (${user}) en la bd de asemon")
+        }
+        else {
+            println("No se pudo crear el usuario (${user}) en la bd de asemon o ya esta creado")
+        }
+    }
+}
+
+def mailNotifyIPD(users) { // Esta funcion envia el correo notificando la accion realizada
+    mail bcc: '',
+    cc: "",
+    charset: 'UTF-8',
+    from: 'jenkins-cmm@bgeneral.com (Eliminacion Usuarios ASEMON)',
+    mimeType: 'text/html',
+    replyTo: '',
+    subject: "Usuarios eliminados en instancia ASEMON",
+    to: "${IPD_MAIL}",
+    body: """
+    <b>Se encontraron los siguientes usuarios inactivos en el Active Directory</b><br>\n\n
+    <br>Verificar la siguiente accion realizada:\n
+    <br><b>${users}</b>
+    <br><b>Serán eliminados de la instancia.</b>
+    """;
+}
