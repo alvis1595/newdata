@@ -1,0 +1,10 @@
+az login
+az account list --output table
+az account set --subscription "bg-spub-prod"
+az appservice plan show --name bg-az-ipd-spub-prod-asp-01 --resource-group rg-spubcommon-prod-eus
+az monitor metrics list-definitions --resource /subscriptions/2dd71cfd-e9d2-4a19-81fd-71edb4a3b720/resourceGroups/rg-spubcommon-prod-eus/providers/Microsoft.Web/serverfarms/bg-az-ipd-spub-prod-asp-01
+
+
+
+az mysql flexible-server show --name bgazipdspu-57a35f7c36-wpdbserver --resource-group rg-spubcommon-prod-eus
+az monitor metrics list-definitions --resource /subscriptions/2dd71cfd-e9d2-4a19-81fd-71edb4a3b720/resourceGroups/rg-spubcommon-prod-eus/providers/Microsoft.DBforMySQL/flexibleServers/bgazipdspu-57a35f7c36-wpdbserver
