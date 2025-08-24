@@ -24,4 +24,8 @@ az monitor metrics list   --resource "$RESOURCE"   --metric CpuPercentage Memory
 
 az monitor metrics list   --resource "$RESOURCE"   --metric cpu_percent memory_percent active_connections total_connections aborted_connections            network_bytes_ingress network_bytes_egress            storage_used storage_percent storage_limit io_consumption_percent storage_io_count            Queries Com_select Com_update Com_insert Com_delete slow_queries   --interval PT5M   --aggregation Average Total   --offset 24h   --output jsonc > db_m.txt
 
+doc:
+https://learn.microsoft.com/en-us/rest/api/appservice/app-service-plans/get?view=rest-appservice-2024-11-01&utm_source=chatgpt.com&tabs=HTTP
+https://learn.microsoft.com/en-us/rest/api/appservice/app-service-plans/get?view=rest-appservice-2024-11-01&utm_source=chatgpt.com&tabs=HTTP#provisioningstate
+https://learn.microsoft.com/en-us/rest/api/appservice/app-service-plans/get?view=rest-appservice-2024-11-01&utm_source=chatgpt.com&tabs=HTTP#statusoptions
 
