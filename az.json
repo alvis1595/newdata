@@ -21,3 +21,7 @@ az monitor metrics list   --resource "$RESOURCE"   --metric CpuPercentage Memory
 az monitor metrics list   --resource "$RESOURCE"   --metric CpuPercentage MemoryPercentage BytesReceived BytesSent DiskQueueLength HttpQueueLength   --interval PT5M   --aggregation Average Total   --dimension Instance   --offset 24h   --output jsonc > metricas3.txt
 
 
+
+az monitor metrics list   --resource "$RESOURCE"   --metric cpu_percent memory_percent active_connections total_connections aborted_connections            network_bytes_ingress network_bytes_egress            storage_used storage_percent storage_limit io_consumption_percent storage_io_count            Queries Com_select Com_update Com_insert Com_delete slow_queries   --interval PT5M   --aggregation Average Total   --offset 24h   --output jsonc > db_m.txt
+
+
