@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Security Group para bastión Windows: permite RDP (TCP 3389) solo desde IPs específicas."
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC donde crear el Security Group.
+  GroupName:
+    Type: String
+    Default: bastion-rdp-sg
+    Description: Nombre del Security Group.
+  # IPs/Rangos permitidos (usa /32 para IPs individuales)
+  AllowedRdpCidr1:
+    Type: String
+    Default: 190.140.140.26/32
+    Description: "IP/CIDR 1 con acceso RDP (ej: 190.140.140.26/32)."
+  AllowedRdpCidr2:
+    Type: String
+    Default: ""
+    Description: "IP/CIDR 2 opcional (dejar vacío para omitir)."
+  AllowedRdpCidr3:
+    Type: String
+    Default: ""
+    Description: "IP/CIDR 3 opcional (dejar vacío para omitir)."
+  AllowedRdpCidr4:
+    Type: String
+    Default: ""
+    Description: "IP/CIDR 4 opcional (dejar vacío para omitir)."
+  AllowedRdpCidr5:
+    Type: String
+    Default: ""
+    Description: "IP/CIDR 5 opcional (dejar vacío para omitir)."
+
+Conditions:
+  HasCidr2: !Not [!Equals [!Ref AllowedRdpCidr2, ""]]
+  HasCidr3: !Not [!Equals [!Ref AllowedRdpCidr3, ""]]
+  HasCidr4: !Not [!Equals [!Ref AllowedRdpCidr4, ""]]
+  HasCidr5: !Not [!Equals [!Ref AllowedRdpCidr5, ""]]
+
+Resources:
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref GroupName
+      GroupDescription: "Permite RDP (TCP/3389) solo desde IPs específicas"
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1              # Salida libre; ajusta si quieres restringir
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Ref GroupName
+        - Key: Purpose
+          Value: Bastion-RDP
+
+  # Reglas de entrada RDP (TCP/3389) por cada IP/CIDR
+  RdpIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BastionSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3389
+      ToPort: 3389
+      CidrIp: !Ref AllowedRdpCidr1
+      Description: "RDP desde AllowedRdpCidr1"
+
+  RdpIngress2:
+    Condition: HasCidr2
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BastionSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3389
+      ToPort: 3389
+      CidrIp: !Ref AllowedRdpCidr2
+      Description: "RDP desde AllowedRdpCidr2"
+
+  RdpIngress3:
+    Condition: HasCidr3
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BastionSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3389
+      ToPort: 3389
+      CidrIp: !Ref AllowedRdpCidr3
+      Description: "RDP desde AllowedRdpCidr3"
+
+  RdpIngress4:
+    Condition: HasCidr4
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BastionSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3389
+      ToPort: 3389
+      CidrIp: !Ref AllowedRdpCidr4
+      Description: "RDP desde AllowedRdpCidr4"
+
+  RdpIngress5:
+    Condition: HasCidr5
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BastionSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3389
+      ToPort: 3389
+      CidrIp: !Ref AllowedRdpCidr5
+      Description: "RDP desde AllowedRdpCidr5"
+
+Outputs:
+  SecurityGroupId:
+    Description: ID del Security Group para asociar a tu EC2 bastion.
+    Value: !Ref BastionSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-BastionSecurityGroupId"
+
+
+------------------------------------------------------------------------------------------
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Security Group para bastión Windows: permite RDP (TCP/3389) solo desde IP específica."
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC donde crear el Security Group.
+  GroupName:
+    Type: String
+    Default: bastion-rdp-sg
+    Description: Nombre del Security Group.
+
+Resources:
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref GroupName
+      GroupDescription: "Permite RDP (TCP/3389) solo desde 190.140.140.26/32"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3389
+          ToPort: 3389
+          CidrIp: 190.140.140.26/32
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Ref GroupName
+        - Key: Purpose
+          Value: Bastion-RDP
+
+Outputs:
+  SecurityGroupId:
+    Description: ID del Security Group para asociar a tu EC2 bastion.
+    Value: !Ref BastionSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-BastionSecurityGroupId"
