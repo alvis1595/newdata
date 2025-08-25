@@ -32,3 +32,63 @@ https://learn.microsoft.com/en-us/rest/api/appservice/app-service-plans/get?view
 
 
 https://learn.microsoft.com/en-us/samples/azure/azure-quickstart-templates/webappazure-oms-monitoring/
+
+
+
+db
+RESOURCE="/subscriptions/2dd71cfd-e9d2-4a19-81fd-71edb4a3b720/resourceGroups/rg-spubcommon-prod-eus/providers/Microsoft.DBforMySQL/flexibleServers/bgazipdspu-57a35f7c36-wpdbserver"
+
+az monitor metrics list \
+  --resource "$RESOURCE" \
+  --metric cpu_percent memory_percent active_connections total_connections aborted_connections \
+           network_bytes_ingress network_bytes_egress \
+           storage_used storage_percent storage_limit io_consumption_percent storage_io_count \
+           Queries Com_select Com_update Com_insert Com_delete slow_queries \
+  --interval PT5M \
+  --aggregation Average Total \
+  --offset 24h \
+  --output jsonc
+
+
+
+RESOURCE="/subscriptions/2dd71cfd-e9d2-4a19-81fd-71edb4a3b720/resourceGroups/rg-spubcommon-prod-eus/providers/Microsoft.Web/serverfarms/bg-az-ipd-spub-prod-asp-01"
+# Por instancia (dimension = Instance)
+az monitor metrics list \
+  --resource "$RESOURCE" \
+  --metric CpuPercentage MemoryPercentage BytesReceived BytesSent DiskQueueLength HttpQueueLength \
+  --interval PT1M \
+  --aggregation Average Total \
+  --dimension Instance \
+  --offset 24h \
+  --output jsonc
+
+# Agregado (todas las instancias juntas)
+az monitor metrics list \
+  --resource "$RESOURCE" \
+  --metric CpuPercentage MemoryPercentage BytesReceived BytesSent DiskQueueLength HttpQueueLength \
+  --interval PT1M \
+  --aggregation Average Total \
+  --offset 24h \
+  --output jsonc
+
+5min
+# Por instancia
+az monitor metrics list \
+  --resource "$RESOURCE" \
+  --metric CpuPercentage MemoryPercentage BytesReceived BytesSent DiskQueueLength HttpQueueLength \
+  --interval PT5M \
+  --aggregation Average Total \
+  --dimension Instance \
+  --offset 24h \
+  --output jsonc
+
+# Agregado
+az monitor metrics list \
+  --resource "$RESOURCE" \
+  --metric CpuPercentage MemoryPercentage BytesReceived BytesSent DiskQueueLength HttpQueueLength \
+  --interval PT5M \
+  --aggregation Average Total \
+  --offset 24h \
+  --output jsonc
+
+
