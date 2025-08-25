@@ -1,0 +1,150 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Bastion EC2 Windows 2022 con EBS gp3 cifrado por KMS, SSM y EIP opcional
+
+Parameters:
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subred donde irá la instancia (pública con ruta al IGW).
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: SG existente que permite RDP (3389) solo desde tus IPs.
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: KeyPair para descifrar la contraseña del usuario Administrator.
+  InstanceType:
+    Type: String
+    Default: t3.large
+    Description: Tipo de instancia (CPU/RAM). Ej: t3.large, m6i.large, etc.
+  RootVolumeSizeGiB:
+    Type: Number
+    Default: 60
+    MinValue: 30
+    Description: Tamaño del disco raíz (GiB).
+  Gp3Iops:
+    Type: Number
+    Default: 3000
+    MinValue: 3000
+    Description: IOPS para gp3.
+  Gp3Throughput:
+    Type: Number
+    Default: 125
+    MinValue: 125
+    Description: Throughput MiB/s para gp3.
+  KmsKeyId:
+    Type: String
+    Description: ID/ARN de tu KMS Key para cifrar EBS.
+  AllocateElasticIP:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true','false']
+    Description: Asignar un Elastic IP a la instancia.
+
+Mappings:
+  UserDataMap:
+    Windows:
+      Script: |
+        <powershell>
+        # Mantener actualizado
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction SilentlyContinue
+        # Habilitar RDP (suele venir habilitado)
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        # Utilidades básicas
+        choco -v 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { Set-ExecutionPolicy Bypass -Scope Process -Force; iwr https://community.chocolatey.org/install.ps1 -UseBasicParsing | iex }
+        choco install -y git 7zip notepadplusplus
+        Write-Host "Bastion Windows listo."
+        </powershell>
+
+Conditions:
+  UseEIP: !Equals [!Ref AllocateElasticIP, 'true']
+
+Resources:
+  # AMI Windows 2022 desde SSM Parameter Store (siempre la más reciente)
+  Win2022Ami:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: /aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base
+
+  BastionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub bastion-win-ssm-${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Path: /
+
+  BastionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref BastionRole]
+      Path: /
+
+  BastionInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref Win2022Ami
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref BastionInstanceProfile
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !Ref SubnetId
+          Groups: [!Ref SecurityGroupId]
+          AssociatePublicIpAddress: true
+          DeleteOnTermination: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: !Ref RootVolumeSizeGiB
+            Iops: !Ref Gp3Iops
+            Throughput: !Ref Gp3Throughput
+            Encrypted: true
+            KmsKeyId: !Ref KmsKeyId
+            DeleteOnTermination: true
+      MetadataOptions:
+        HttpTokens: required      # IMDSv2 obligatorio
+        HttpEndpoint: enabled
+      Tags:
+        - Key: Name
+          Value: !Sub bastion-win-${AWS::StackName}
+        - Key: Role
+          Value: bastion
+      UserData:
+        Fn::Base64: !FindInMap [UserDataMap, Windows, Script]
+
+  EipForBastion:
+    Type: AWS::EC2::EIP
+    Condition: UseEIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub eip-bastion-win-${AWS::StackName}
+
+  EipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Condition: UseEIP
+    Properties:
+      AllocationId: !GetAtt EipForBastion.AllocationId
+      InstanceId: !Ref BastionInstance
+
+Outputs:
+  InstanceId:
+    Description: ID de la instancia bastion.
+    Value: !Ref BastionInstance
+  PrivateIp:
+    Description: IP privada de la instancia.
+    Value: !GetAtt BastionInstance.PrivateIp
+  PublicIp:
+    Description: IP pública (EIP si se eligió).
+    Value: !If [UseEIP, !Ref EipForBastion, !GetAtt BastionInstance.PublicIp]
+  AmiId:
+    Description: AMI usada (Windows Server 2022 desde SSM).
+    Value: !Ref Win2022Ami
