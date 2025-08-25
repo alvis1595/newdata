@@ -1,4 +1,4 @@
-az login
+#az login
 az account list --output table
 az account set --subscription "bg-spub-prod"
 az appservice plan show --name bg-az-ipd-spub-prod-asp-01 --resource-group rg-spubcommon-prod-eus
@@ -29,3 +29,6 @@ https://learn.microsoft.com/en-us/rest/api/appservice/app-service-plans/get?view
 https://learn.microsoft.com/en-us/rest/api/appservice/app-service-plans/get?view=rest-appservice-2024-11-01&utm_source=chatgpt.com&tabs=HTTP#provisioningstate
 https://learn.microsoft.com/en-us/rest/api/appservice/app-service-plans/get?view=rest-appservice-2024-11-01&utm_source=chatgpt.com&tabs=HTTP#statusoptions
 
+
+
+https://learn.microsoft.com/en-us/samples/azure/azure-quickstart-templates/webappazure-oms-monitoring/
