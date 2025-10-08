@@ -5,3 +5,5 @@ awx                 ansible_host=192.168.0.11
 prometheus_fisico   ansible_host=192.168.0.12
 nuevo
 tres
+[Sepq]
+postmalone
